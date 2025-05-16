@@ -66,7 +66,7 @@ const AddEditProductForm = ({ product, onSubmit, onCancel, isLoading }: AddEditP
         <Label htmlFor="product-category">Category</Label>
         <Select value={category} onValueChange={setCategory}>
           <SelectTrigger id="product-category">
-            <SelectValue placeholder="Select category" />
+            <SelectValue /> {/* Removed placeholder="Select category" */}
           </SelectTrigger>
           <SelectContent>
             {productCategories.filter(cat => cat !== "all").map((cat) => (
