@@ -4,17 +4,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { findMockProductByIdAsync, getMockProductsAsync } from "@/lib/mockData"; // Updated import
 import type { Product } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card"; // Removed CardHeader, CardFooter, CardTitle
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Tag, ArrowLeft, AlertCircle, CheckCircle, Heart, Loader2 } from "lucide-react"; // Added Loader2
+import { ShoppingCart, Tag, ArrowLeft, AlertCircle, CheckCircle, Heart, Loader2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useProducts } from "@/context/ProductContext"; // Import useProducts
+import { useEffect, useState, useMemo } from "react";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -23,49 +23,66 @@ export default function ProductDetailPage() {
   const { addToCart } = useCart();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { products: allProducts, isLoading: productsLoading, findProductById: findProductFromContext, fetchProducts } = useProducts();
 
   const [product, setProduct] = useState<Product | undefined>(undefined);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // Combined loading state
+  // Removed relatedProducts state, will derive from allProducts
+  const [isFetchingDetails, setIsFetchingDetails] = useState(true);
 
   useEffect(() => {
     const fetchProductData = async () => {
       if (productId && typeof productId === 'string') {
-        setIsLoading(true);
+        setIsFetchingDetails(true);
         try {
-          // In a real app, these would call API endpoints connected to PostgreSQL
-          const foundProduct = await findMockProductByIdAsync(productId);
+          // Try to get from context first
+          let foundProduct = allProducts.find(p => p.id === productId);
+          if (!foundProduct) {
+            // If not in context (e.g., direct navigation), fetch individually
+            foundProduct = await findProductFromContext(productId);
+          }
           setProduct(foundProduct);
 
-          if (foundProduct) {
-            const allProducts = await getMockProductsAsync();
-            const filteredRelated = allProducts
-              .filter(p => p.id !== foundProduct.id && p.category === foundProduct.category)
-              .slice(0, 4);
-            setRelatedProducts(filteredRelated);
-          } else {
-            setRelatedProducts([]);
+          if (!allProducts.length && foundProduct) { // If context was empty, fetch all for related items
+            await fetchProducts(); // Ensure related products can be found
           }
+
         } catch (error) {
           console.error("Failed to fetch product data:", error);
-          setProduct(undefined); // Ensure product is undefined on error
-          setRelatedProducts([]);
+          setProduct(undefined);
           toast({
             title: "Error",
             description: "Could not load product details.",
             variant: "destructive",
           });
         } finally {
-          setIsLoading(false);
+          setIsFetchingDetails(false);
         }
       } else {
-        setIsLoading(false);
-        setProduct(undefined); // Handle case where productId is not valid
+        setIsFetchingDetails(false);
+        setProduct(undefined);
       }
     };
 
-    fetchProductData();
-  }, [productId, toast]);
+    // if products are already loaded in context, try finding it directly
+    if (allProducts.length > 0) {
+        const p = allProducts.find(p => p.id === productId);
+        if (p) {
+            setProduct(p);
+            setIsFetchingDetails(false);
+        } else {
+             fetchProductData(); // Not found in current context, fetch
+        }
+    } else {
+        fetchProductData(); // Context not loaded yet, fetch
+    }
+  }, [productId, allProducts, findProductFromContext, toast, fetchProducts]);
+
+  const relatedProducts = useMemo(() => {
+    if (!product || !allProducts.length) return [];
+    return allProducts
+      .filter(p => p.id !== product.id && p.category === product.category)
+      .slice(0, 4);
+  }, [product, allProducts]);
 
   const handleAddToCart = () => {
     if (product) {
@@ -88,16 +105,18 @@ export default function ProductDetailPage() {
     toast({
         title: isInWishlist ? "Removed from Wishlist" : "Added to Wishlist",
         description: product?.name + (isInWishlist ? " removed from your wishlist." : " added to your wishlist."),
-        action: (
-          <Button variant="outline" size="sm" onClick={() => router.push('/wishlist')}>
-            View Wishlist
-          </Button>
-        )
+        // Example action for a wishlist page (not yet implemented)
+        // action: ( 
+        //   <Button variant="outline" size="sm" onClick={() => router.push('/wishlist')}>
+        //     View Wishlist
+        //   </Button>
+        // )
     });
   };
 
+  const isLoading = productsLoading || isFetchingDetails;
 
-  if (isLoading) {
+  if (isLoading && !product) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -207,26 +226,26 @@ export default function ProductDetailPage() {
       <div className="mt-16">
         <Separator className="mb-8"/>
         <h2 className="text-2xl font-bold mb-6 text-center">You Might Also Like</h2>
-        {isLoading ? (
+        {productsLoading && relatedProducts.length === 0 ? ( // Show loader if context is loading and no related products yet
           <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
         ) : relatedProducts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.map(relatedProduct => (
-              <Card key={relatedProduct.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <Link href={`/products/${relatedProduct.id}`}>
+            {relatedProducts.map(relatedProd => ( // Renamed variable to avoid conflict
+              <Card key={relatedProd.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <Link href={`/products/${relatedProd.id}`}>
                   <Image
-                    src={relatedProduct.imageUrl || "https://placehold.co/300x300.png"}
-                    alt={relatedProduct.name}
+                    src={relatedProd.imageUrl || "https://placehold.co/300x300.png"}
+                    alt={relatedProd.name}
                     width={300}
                     height={300}
                     className="w-full h-48 object-cover"
-                    data-ai-hint={`${relatedProduct.category} related item`}
+                    data-ai-hint={`${relatedProd.category} related item`}
                   />
                   <CardContent className="p-3">
-                    <CardTitle className="text-md font-semibold truncate mb-1">{relatedProduct.name}</CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground capitalize mb-1">{relatedProduct.category}</CardDescription>
+                    <h3 className="text-md font-semibold truncate mb-1">{relatedProd.name}</h3> {/* Changed to h3 for semantic card title */}
+                    <p className="text-xs text-muted-foreground capitalize mb-1">{relatedProd.category}</p> {/* Changed to p for description */}
                     <p className="text-md font-semibold text-primary">
-                      ${relatedProduct.discount ? (relatedProduct.price * (1 - relatedProduct.discount/100)).toFixed(2) : relatedProduct.price.toFixed(2)}
+                      ${relatedProd.discount ? (relatedProd.price * (1 - relatedProd.discount/100)).toFixed(2) : relatedProd.price.toFixed(2)}
                     </p>
                   </CardContent>
                 </Link>
@@ -240,3 +259,4 @@ export default function ProductDetailPage() {
     </div>
   );
 }
+

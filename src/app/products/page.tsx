@@ -3,11 +3,11 @@
 
 import { useState, useMemo, useEffect } from "react";
 import ProductCard from "@/components/ProductCard";
-import { getMockProductsAsync, productCategories } from "@/lib/mockData"; // Updated import
+import { productCategories } from "@/lib/mockData";
 import type { Product } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ListFilter, LayoutGrid, LayoutList, Loader2 } from "lucide-react"; // Added Loader2
+import { Search, ListFilter, LayoutGrid, LayoutList, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Pagination,
@@ -17,29 +17,21 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination"
-
+} from "@/components/ui/pagination";
+import { useProducts } from "@/context/ProductContext"; // Import useProducts
 
 const ITEMS_PER_PAGE = 6;
 
 export default function ProductsPage() {
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { products: allProducts, isLoading, fetchProducts } = useProducts(); // Use ProductContext
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [layout, setLayout] = useState<"grid" | "list">("grid");
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setIsLoading(true);
-      // In a real app, this would call an API endpoint connected to PostgreSQL
-      const products = await getMockProductsAsync();
-      setAllProducts(products);
-      setIsLoading(false);
-    };
-    fetchProducts();
-  }, []);
+  // useEffect to call fetchProducts if needed, e.g., on mount if context doesn't auto-fetch or for refresh logic
+  // In this setup, ProductContext fetches on its own mount.
+  // If you need a manual refresh button, you could call fetchProducts().
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((product) => {
@@ -131,7 +123,7 @@ export default function ProductsPage() {
     return items;
   };
 
-  if (isLoading) {
+  if (isLoading && !allProducts.length) { // Show loader if loading and no products yet
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -177,7 +169,23 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {paginatedProducts.length > 0 ? (
+      {isLoading && paginatedProducts.length === 0 && ( // Show loader if actively loading and results will be empty
+         <div className="flex justify-center items-center min-h-[40vh]">
+           <Loader2 className="h-12 w-12 animate-spin text-primary" />
+         </div>
+      )}
+
+      {!isLoading && paginatedProducts.length === 0 && (
+         <div className="text-center py-12">
+          <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No Products Found</h3>
+          <p className="text-muted-foreground">
+            Try adjusting your search or filter criteria.
+          </p>
+        </div>
+      )}
+
+      {paginatedProducts.length > 0 && (
         <>
          <div className={layout === 'grid' ? 
             "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" : 
@@ -201,14 +209,6 @@ export default function ProductsPage() {
             </Pagination>
           )}
         </>
-      ) : (
-        <div className="text-center py-12">
-          <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-xl font-semibold mb-2">No Products Found</h3>
-          <p className="text-muted-foreground">
-            Try adjusting your search or filter criteria.
-          </p>
-        </div>
       )}
     </div>
   );
