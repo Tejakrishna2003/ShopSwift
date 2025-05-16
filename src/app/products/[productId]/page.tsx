@@ -4,13 +4,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { mockProducts, productCategories } from "@/lib/mockData";
+import { findMockProductByIdAsync, getMockProductsAsync } from "@/lib/mockData"; // Updated import
 import type { Product } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, Tag, ArrowLeft, AlertCircle, CheckCircle, Heart } from "lucide-react";
+import { ShoppingCart, Tag, ArrowLeft, AlertCircle, CheckCircle, Heart, Loader2 } from "lucide-react"; // Added Loader2
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -25,15 +25,47 @@ export default function ProductDetailPage() {
   const { toast } = useToast();
 
   const [product, setProduct] = useState<Product | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true); // Combined loading state
 
   useEffect(() => {
-    if (productId) {
-      const foundProduct = mockProducts.find((p) => p.id === productId);
-      setProduct(foundProduct);
-    }
-    setLoading(false);
-  }, [productId]);
+    const fetchProductData = async () => {
+      if (productId && typeof productId === 'string') {
+        setIsLoading(true);
+        try {
+          // In a real app, these would call API endpoints connected to PostgreSQL
+          const foundProduct = await findMockProductByIdAsync(productId);
+          setProduct(foundProduct);
+
+          if (foundProduct) {
+            const allProducts = await getMockProductsAsync();
+            const filteredRelated = allProducts
+              .filter(p => p.id !== foundProduct.id && p.category === foundProduct.category)
+              .slice(0, 4);
+            setRelatedProducts(filteredRelated);
+          } else {
+            setRelatedProducts([]);
+          }
+        } catch (error) {
+          console.error("Failed to fetch product data:", error);
+          setProduct(undefined); // Ensure product is undefined on error
+          setRelatedProducts([]);
+          toast({
+            title: "Error",
+            description: "Could not load product details.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setIsLoading(false);
+        setProduct(undefined); // Handle case where productId is not valid
+      }
+    };
+
+    fetchProductData();
+  }, [productId, toast]);
 
   const handleAddToCart = () => {
     if (product) {
@@ -41,7 +73,6 @@ export default function ProductDetailPage() {
     }
   };
   
-  // Placeholder for wishlist functionality
   const [isInWishlist, setIsInWishlist] = useState(false);
   const handleToggleWishlist = () => {
     if (!user) {
@@ -53,7 +84,7 @@ export default function ProductDetailPage() {
         router.push("/auth?tab=login");
         return;
     }
-    setIsInWishlist(!isInWishlist); // Toggle state
+    setIsInWishlist(!isInWishlist);
     toast({
         title: isInWishlist ? "Removed from Wishlist" : "Added to Wishlist",
         description: product?.name + (isInWishlist ? " removed from your wishlist." : " added to your wishlist."),
@@ -66,10 +97,10 @@ export default function ProductDetailPage() {
   };
 
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </div>
     );
   }
@@ -100,7 +131,6 @@ export default function ProductDetailPage() {
       </Button>
 
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
-        {/* Product Image Section */}
         <div className="bg-card rounded-lg shadow-lg overflow-hidden sticky top-24">
           <Image
             src={product.imageUrl || "https://placehold.co/600x600.png"}
@@ -109,7 +139,7 @@ export default function ProductDetailPage() {
             height={600}
             className="w-full h-auto object-cover aspect-square"
             data-ai-hint={`${product.category} product detail`}
-            priority // Prioritize loading main product image
+            priority
           />
            {product.discount && (
             <div className="absolute top-4 right-4 bg-destructive text-destructive-foreground px-3 py-1.5 text-sm font-semibold rounded-md flex items-center gap-1 shadow-md">
@@ -118,12 +148,10 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        {/* Product Details Section */}
         <div className="flex flex-col space-y-6">
           <div>
             <Badge variant="secondary" className="capitalize mb-2">{product.category}</Badge>
             <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground">{product.name}</h1>
-            {/* Placeholder for seller info/link */}
             {product.sellerId && <p className="text-sm text-muted-foreground mt-1">Sold by: Seller {product.sellerId.substring(0,6)}</p>}
           </div>
 
@@ -173,47 +201,41 @@ export default function ProductDetailPage() {
               {isInWishlist ? "Remove from Wishlist" : "Add to Wishlist"}
             </Button>
           </div>
-          
-          {/* Future sections for Reviews, Q&A, etc. can be added here */}
-          {/* 
-          <Separator />
-          <div>
-            <h2 className="text-xl font-semibold mb-3">Customer Reviews</h2>
-            <p className="text-muted-foreground">Reviews coming soon!</p>
-          </div> 
-          */}
         </div>
       </div>
-       {/* Related Products Section (Placeholder) */}
+
       <div className="mt-16">
         <Separator className="mb-8"/>
         <h2 className="text-2xl font-bold mb-6 text-center">You Might Also Like</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {mockProducts.filter(p => p.id !== productId && p.category === product.category).slice(0, 4).map(relatedProduct => (
-            <Card key={relatedProduct.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-              <Link href={`/products/${relatedProduct.id}`}>
-                <Image
-                  src={relatedProduct.imageUrl || "https://placehold.co/300x300.png"}
-                  alt={relatedProduct.name}
-                  width={300}
-                  height={300}
-                  className="w-full h-48 object-cover"
-                  data-ai-hint={`${relatedProduct.category} related item`}
-                />
-                <CardContent className="p-3">
-                  <CardTitle className="text-md font-semibold truncate mb-1">{relatedProduct.name}</CardTitle>
-                  <CardDescription className="text-xs text-muted-foreground capitalize mb-1">{relatedProduct.category}</CardDescription>
-                  <p className="text-md font-semibold text-primary">
-                    ${relatedProduct.discount ? (relatedProduct.price * (1 - relatedProduct.discount/100)).toFixed(2) : relatedProduct.price.toFixed(2)}
-                  </p>
-                </CardContent>
-              </Link>
-            </Card>
-          ))}
-          {mockProducts.filter(p => p.id !== productId && p.category === product.category).length === 0 && (
-            <p className="col-span-full text-center text-muted-foreground">No related products in this category yet.</p>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        ) : relatedProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {relatedProducts.map(relatedProduct => (
+              <Card key={relatedProduct.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <Link href={`/products/${relatedProduct.id}`}>
+                  <Image
+                    src={relatedProduct.imageUrl || "https://placehold.co/300x300.png"}
+                    alt={relatedProduct.name}
+                    width={300}
+                    height={300}
+                    className="w-full h-48 object-cover"
+                    data-ai-hint={`${relatedProduct.category} related item`}
+                  />
+                  <CardContent className="p-3">
+                    <CardTitle className="text-md font-semibold truncate mb-1">{relatedProduct.name}</CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground capitalize mb-1">{relatedProduct.category}</CardDescription>
+                    <p className="text-md font-semibold text-primary">
+                      ${relatedProduct.discount ? (relatedProduct.price * (1 - relatedProduct.discount/100)).toFixed(2) : relatedProduct.price.toFixed(2)}
+                    </p>
+                  </CardContent>
+                </Link>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <p className="col-span-full text-center text-muted-foreground">No related products in this category yet.</p>
+        )}
       </div>
     </div>
   );

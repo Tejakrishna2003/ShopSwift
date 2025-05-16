@@ -1,10 +1,16 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { mockProducts as initialProducts } from "@/lib/mockData";
+import {
+  getMockProductsAsync,
+  addMockProductAsync,
+  updateMockProductAsync,
+  deleteMockProductAsync
+} from "@/lib/mockData"; // Updated imports
 import type { Product } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -41,17 +45,28 @@ export default function SellerProductsPage() {
   const [sellerProducts, setSellerProducts] = useState<Product[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // For form submissions
+  const [isLoadingData, setIsLoadingData] = useState(true); // For fetching products
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false); // For form submissions/deletions
+
+
+  const fetchSellerProducts = async (sellerId: string) => {
+    setIsLoadingData(true);
+    // In a real app, this would fetch products for the specific sellerId from PostgreSQL
+    const allProducts = await getMockProductsAsync();
+    // For mock, filter by sellerId or show products without sellerId for demo purposes
+    setSellerProducts(allProducts.filter(p => p.sellerId === sellerId || !p.sellerId));
+    setIsLoadingData(false);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/auth");
     } else if (user && user.role !== "seller") {
-      router.push("/"); // Redirect non-sellers
+      router.push("/"); 
     } else if (user) {
-      // Simulate fetching seller's products
-      setSellerProducts(initialProducts.filter(p => p.sellerId === user.id || !p.sellerId)); // Show products with matching sellerId or generic ones for demo
+      fetchSellerProducts(user.id);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, router]);
 
   const handleAddProduct = () => {
@@ -64,49 +79,63 @@ export default function SellerProductsPage() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    // Simulate API call
-    setIsLoading(true);
-    setTimeout(() => {
-      setSellerProducts((prev) => prev.filter((p) => p.id !== productId));
-      toast({ title: "Product Deleted", description: "The product has been successfully deleted." });
-      setIsLoading(false);
-    }, 500);
+  const handleDeleteProduct = async (productId: string) => {
+    if (!user) return;
+    setIsSubmittingForm(true);
+    try {
+      // In a real app, this would call an API endpoint to delete from PostgreSQL
+      const success = await deleteMockProductAsync(productId, user.id);
+      if (success) {
+        setSellerProducts((prev) => prev.filter((p) => p.id !== productId));
+        toast({ title: "Product Deleted", description: "The product has been successfully deleted." });
+      } else {
+        toast({ title: "Error", description: "Failed to delete product or unauthorized.", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Delete product error:", error);
+      toast({ title: "Error", description: "Could not delete product.", variant: "destructive" });
+    } finally {
+      setIsSubmittingForm(false);
+    }
   };
 
-  const handleFormSubmit = (productData: Omit<Product, "id" | "sellerId" | "imageUrl"> & { id?: string }) => {
-    setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+  const handleFormSubmit = async (productData: Omit<Product, "id" | "sellerId" | "imageUrl"> & { id?: string }) => {
+    if (!user) return;
+    setIsSubmittingForm(true);
+    try {
       if (editingProduct && productData.id) { // Editing existing product
-        setSellerProducts((prev) =>
-          prev.map((p) => (p.id === productData.id ? { ...p, ...productData, sellerId: user!.id, imageUrl: p.imageUrl || "https://placehold.co/600x400.png" } : p))
-        );
-        toast({ title: "Product Updated", description: "The product has been successfully updated." });
+        const updatedProduct = await updateMockProductAsync(productData.id, productData, user.id);
+        if (updatedProduct) {
+          setSellerProducts((prev) =>
+            prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+          );
+          toast({ title: "Product Updated", description: "The product has been successfully updated." });
+        } else {
+           toast({ title: "Error", description: "Failed to update product or unauthorized.", variant: "destructive" });
+        }
       } else { // Adding new product
-        const newProduct: Product = {
-          ...productData,
-          id: Date.now().toString(), // Generate mock ID
-          sellerId: user!.id, // Assign current seller's ID
-          imageUrl: "https://placehold.co/600x400.png", // Default image
-        };
+        const newProduct = await addMockProductAsync(productData, user.id);
         setSellerProducts((prev) => [newProduct, ...prev]);
         toast({ title: "Product Added", description: "The new product has been successfully added." });
       }
       setIsFormOpen(false);
       setEditingProduct(null);
-      setIsLoading(false);
-    }, 1000);
+    } catch (error) {
+      console.error("Form submit error:", error);
+      toast({ title: "Error", description: "Could not save product.", variant: "destructive" });
+    } finally {
+      setIsSubmittingForm(false);
+    }
   };
 
-  if (authLoading) {
+  if (authLoading || isLoadingData) {
     return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>;
   }
   
   if (!user || user.role !== 'seller') {
+     // This case should ideally be handled by the useEffect redirect, but as a fallback:
      return <div className="text-center py-10"><p>You must be logged in as a seller to view this page.</p></div>;
   }
-
 
   return (
     <div className="space-y-6">
@@ -114,7 +143,10 @@ export default function SellerProductsPage() {
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Package className="h-8 w-8 text-primary" /> My Products
         </h1>
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+          setIsFormOpen(isOpen);
+          if (!isOpen) setEditingProduct(null); // Reset editingProduct when dialog closes
+        }}>
           <DialogTrigger asChild>
             <Button onClick={handleAddProduct} className="flex items-center gap-2">
               <PlusCircle size={18} /> Add New Product
@@ -131,7 +163,7 @@ export default function SellerProductsPage() {
               product={editingProduct}
               onSubmit={handleFormSubmit}
               onCancel={() => { setIsFormOpen(false); setEditingProduct(null); }}
-              isLoading={isLoading}
+              isLoading={isSubmittingForm}
             />
           </DialogContent>
         </Dialog>
@@ -168,12 +200,12 @@ export default function SellerProductsPage() {
                   <TableCell>${product.price.toFixed(2)}</TableCell>
                   <TableCell className="hidden lg:table-cell">{product.discount ? `${product.discount}%` : "-"}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="text-primary hover:text-primary/80" aria-label="Edit Product">
+                    <Button variant="ghost" size="icon" onClick={() => handleEditProduct(product)} className="text-primary hover:text-primary/80" aria-label="Edit Product" disabled={isSubmittingForm}>
                       <Edit size={18} />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" aria-label="Delete Product">
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/80" aria-label="Delete Product" disabled={isSubmittingForm}>
                           <Trash2 size={18} />
                         </Button>
                       </AlertDialogTrigger>
@@ -185,9 +217,9 @@ export default function SellerProductsPage() {
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteProduct(product.id)} disabled={isLoading} className="bg-destructive hover:bg-destructive/90">
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          <AlertDialogCancel disabled={isSubmittingForm}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteProduct(product.id)} disabled={isSubmittingForm} className="bg-destructive hover:bg-destructive/90">
+                            {isSubmittingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Delete
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -206,7 +238,7 @@ export default function SellerProductsPage() {
           <p className="text-muted-foreground mb-4">
             You haven't added any products. Click "Add New Product" to get started.
           </p>
-           <Button onClick={handleAddProduct} className="flex items-center gap-2 mx-auto">
+           <Button onClick={handleAddProduct} className="flex items-center gap-2 mx-auto" disabled={isSubmittingForm}>
               <PlusCircle size={18} /> Add New Product
             </Button>
         </div>

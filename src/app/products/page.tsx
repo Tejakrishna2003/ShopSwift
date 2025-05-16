@@ -1,12 +1,13 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
 import ProductCard from "@/components/ProductCard";
-import { mockProducts, productCategories } from "@/lib/mockData";
+import { getMockProductsAsync, productCategories } from "@/lib/mockData"; // Updated import
 import type { Product } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ListFilter, LayoutGrid, LayoutList } from "lucide-react";
+import { Search, ListFilter, LayoutGrid, LayoutList, Loader2 } from "lucide-react"; // Added Loader2
 import { Button } from "@/components/ui/button";
 import {
   Pagination,
@@ -22,19 +23,32 @@ import {
 const ITEMS_PER_PAGE = 6;
 
 export default function ProductsPage() {
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [layout, setLayout] = useState<"grid" | "list">("grid"); // Default to grid view
+  const [layout, setLayout] = useState<"grid" | "list">("grid");
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      // In a real app, this would call an API endpoint connected to PostgreSQL
+      const products = await getMockProductsAsync();
+      setAllProducts(products);
+      setIsLoading(false);
+    };
+    fetchProducts();
+  }, []);
 
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter((product) => {
+    return allProducts.filter((product) => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             product.description.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === "all" || product.category.toLowerCase() === selectedCategory.toLowerCase();
       return matchesSearch && matchesCategory;
     });
-  }, [searchTerm, selectedCategory]);
+  }, [allProducts, searchTerm, selectedCategory]);
 
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -56,7 +70,7 @@ export default function ProductsPage() {
   
   const renderPaginationItems = () => {
     const items = [];
-    const maxVisiblePages = 5; // Max pages to show (e.g., 1 ... 3 4 5 ... 10)
+    const maxVisiblePages = 5;
     
     if (totalPages <= maxVisiblePages) {
       for (let i = 1; i <= totalPages; i++) {
@@ -69,7 +83,6 @@ export default function ProductsPage() {
         );
       }
     } else {
-      // Show first page
       items.push(
         <PaginationItem key={1}>
           <PaginationLink href="#" onClick={(e) => {e.preventDefault(); handlePageChange(1);}} isActive={currentPage === 1}>
@@ -78,7 +91,6 @@ export default function ProductsPage() {
         </PaginationItem>
       );
 
-      // Ellipsis or intermediate pages
       let startPage = Math.max(2, currentPage - 1);
       let endPage = Math.min(totalPages - 1, currentPage + 1);
 
@@ -108,7 +120,6 @@ export default function ProductsPage() {
         items.push(<PaginationEllipsis key="end-ellipsis" />);
       }
 
-      // Show last page
       items.push(
         <PaginationItem key={totalPages}>
           <PaginationLink href="#" onClick={(e) => {e.preventDefault(); handlePageChange(totalPages);}} isActive={currentPage === totalPages}>
@@ -120,6 +131,13 @@ export default function ProductsPage() {
     return items;
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
