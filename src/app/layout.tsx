@@ -1,10 +1,14 @@
 
+// Removed "use client"; RootLayout is now a Server Component by default
+
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import AppProviders from '@/context/AppProviders';
-import AppHeader from '@/components/AppHeader'; // Corrected import path
+import AppHeader from '@/components/AppHeader';
+import DynamicFooterYear from '@/components/DynamicFooterYear'; // Import the new component
+// Removed useState, useEffect imports
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -16,6 +20,7 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+// Static metadata can be exported from Server Component layouts
 export const metadata: Metadata = {
   title: 'ShopSwift',
   description: 'A simple e-commerce application for buying and selling products.',
@@ -26,11 +31,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Removed useState and useEffect for dynamicYear
+
   return (
     <html lang="en" suppressHydrationWarning>
-      <body 
+      <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
-        suppressHydrationWarning={true}
+        suppressHydrationWarning={true} // Keep this for extension attributes on body
       >
         <AppProviders>
           <AppHeader />
@@ -38,7 +45,7 @@ export default function RootLayout({
             {children}
           </main>
           <footer className="bg-card py-6 text-center text-muted-foreground border-t">
-            <p>&copy; {new Date().getFullYear()} ShopSwift. All rights reserved.</p>
+            <p>&copy; <DynamicFooterYear /> ShopSwift. All rights reserved.</p> {/* Use the new component */}
           </footer>
           <Toaster />
         </AppProviders>
