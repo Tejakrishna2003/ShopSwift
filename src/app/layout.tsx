@@ -137,7 +137,7 @@ export default function RootLayout({
                   <Link href="/terms" className="hover:text-primary transition-colors">Terms and Conditions</Link>
                   <Link href="/sitemap" className="hover:text-primary transition-colors">Sitemap</Link>
                 </div>
-                <p className="mt-4 md:mt-0">Denmark</p> {/* Placeholder for country */}
+                <p className="mt-4 md:mt-0">INDIA</p> {/* Updated country */}
               </div>
             </div>
           </footer>
