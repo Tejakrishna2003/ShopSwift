@@ -27,6 +27,13 @@ export const metadata: Metadata = {
   description: 'A simple e-commerce application for buying and selling products.',
 };
 
+const socialLinks = [
+  { name: "Facebook", href: "https://facebook.com", icon: <Facebook size={20} /> },
+  { name: "Instagram", href: "https://instagram.com", icon: <Instagram size={20} /> },
+  { name: "Pinterest", href: "https://pinterest.com", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c0-2.209-1.791-4-4-4s-4 1.791-4 4c0 1.481.811 2.772 2 3.444V12M12 12c0-2.209 1.791-4 4-4s4 1.791 4 4c0 1.481-.811 2.772-2 3.444V12M12 12v10M4 16h16"/></svg> }, // Simple Pin icon
+  { name: "TikTok", href: "https://tiktok.com", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4H8a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4V8a4 4 0 0 0-4-4z"></path><path d="M12 15V9"></path><path d="M9 9h6"></path></svg> }, // Simple TikTok like icon
+];
+
 const footerLinkGroups = [
   {
     title: "SHOP",
@@ -68,23 +75,8 @@ const footerLinkGroups = [
       { label: "Investor Relations", href: "/investors" },
       { label: "Press", href: "/press" },
     ],
+    // Social links will be appended here dynamically
   },
-];
-
-const paymentMethods = [
-  { name: "VISA", icon: <CreditCard size={24} /> },
-  { name: "Apple Pay", icon: <CreditCard size={24} /> }, // Placeholder icon
-  { name: "Google Pay", icon: <CreditCard size={24} /> }, // Placeholder icon
-  { name: "Klarna", icon: <CreditCard size={24} /> }, // Placeholder icon
-  { name: "Mastercard", icon: <CreditCard size={24} /> }, // Placeholder icon
-  { name: "PayPal", icon: <CreditCard size={24} /> }, // Placeholder icon
-];
-
-const socialLinks = [
-  { name: "Facebook", href: "https://facebook.com", icon: <Facebook size={20} /> },
-  { name: "Instagram", href: "https://instagram.com", icon: <Instagram size={20} /> },
-  { name: "Pinterest", href: "https://pinterest.com", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c0-2.209-1.791-4-4-4s-4 1.791-4 4c0 1.481.811 2.772 2 3.444V12M12 12c0-2.209 1.791-4 4-4s4 1.791 4 4c0 1.481-.811 2.772-2 3.444V12M12 12v10M4 16h16"/></svg> }, // Simple Pin icon
-  { name: "TikTok", href: "https://tiktok.com", icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4H8a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4V8a4 4 0 0 0-4-4z"></path><path d="M12 15V9"></path><path d="M9 9h6"></path></svg> }, // Simple TikTok like icon
 ];
 
 
@@ -120,26 +112,21 @@ export default function RootLayout({
                         </li>
                       ))}
                     </ul>
+                    {/* Conditionally render social links under INFO group */}
+                    {group.title === "INFO" && (
+                      <div className="mt-6"> {/* Added margin top for spacing */}
+                        <h4 className="text-xs font-semibold uppercase tracking-wider mb-3 text-muted-foreground/80">Follow Us</h4>
+                        <div className="flex items-center gap-3">
+                          {socialLinks.map((social) => (
+                            <Link key={social.name} href={social.href} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" aria-label={social.name}>
+                              {social.icon}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
-              </div>
-
-              <div className="mb-10">
-                <div className="flex flex-wrap justify-center md:justify-start items-center gap-4 mb-4">
-                  {paymentMethods.map((method) => (
-                    <div key={method.name} className="flex items-center gap-1 p-2 border border-border rounded-md text-muted-foreground text-xs" title={method.name}>
-                      {method.icon}
-                      <span className="hidden sm:inline">{method.name}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-center md:justify-start items-center gap-4">
-                  {socialLinks.map((social) => (
-                    <Link key={social.name} href={social.href} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors" aria-label={social.name}>
-                      {social.icon}
-                    </Link>
-                  ))}
-                </div>
               </div>
               
               <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
